@@ -1,8 +1,13 @@
+import sys
+
+sys.path.append("..")
+
 import argparse
 import csv
 from typing import Dict, List, Tuple
 
 import pandas as pd
+
 from io_utils import read_file
 
 
@@ -13,22 +18,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--templates",
         help="Path to templates file",
-        default="templates.tsv",
+        default="data/templates.tsv",
     )
     parser.add_argument(
         "--nationalities",
         help="Path to nationalities file",
-        default="nationalities.tsv",
+        default="data/nationalities.tsv",
     )
     parser.add_argument(
         "--topics",
         help="Path to topics file",
-        default="topics.tsv",
+        default="data/topics.tsv",
     )
     parser.add_argument(
         "--output",
         help="Path to output file",
-        default="prompts.tsv",
+        default="data/prompts.tsv",
     )
 
     return parser.parse_args()
@@ -115,8 +120,6 @@ def main() -> None:
     prompts = generate_prompts(templates, nationalities, topics)
 
     print(f"Length of generated prompts: {len(prompts)}")
-    print("Sample prompt:")
-    print(prompts[0])
 
     # Write output
     print(f"Output file: {args.output}")
@@ -125,7 +128,6 @@ def main() -> None:
         args.output, sep="\t", index=False, quoting=csv.QUOTE_ALL, quotechar='"'
     )
     print(f"Successfully wrote {len(prompts)} prompts to: {args.output}")
-    print("Done!")
 
 
 if __name__ == "__main__":
