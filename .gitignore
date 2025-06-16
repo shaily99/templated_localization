@@ -4,7 +4,8 @@ old_code/*
 *.tsv
 *.err
 *.log
-logs/*
+*.out
+*.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
