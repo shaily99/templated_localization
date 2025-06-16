@@ -1,13 +1,8 @@
-import sys
-
-sys.path.append("..")
-
 import argparse
 import csv
 from typing import Dict, List, Tuple
 
 import pandas as pd
-
 from io_utils import read_file
 
 
