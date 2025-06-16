@@ -37,4 +37,4 @@ def load_prompts(
 
     prompts_df.reset_index(drop=True, inplace=True)
 
-    return prompts_df
+    return prompts_df, start_index, end_index
