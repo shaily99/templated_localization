@@ -3,6 +3,7 @@ import csv
 from typing import Dict, List, Tuple
 
 import pandas as pd
+from io_utils import read_file
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,11 +32,6 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-def read_file(file_path: str) -> pd.DataFrame:
-    """Reads a tab-separated file into a pandas DataFrame. Treats the first row as the header."""
-    return pd.read_csv(file_path, sep="\t", header=0)
 
 
 def handle_vowels(template: str, nationality: str) -> str:
