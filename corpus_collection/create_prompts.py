@@ -3,7 +3,7 @@ import csv
 from typing import Dict, List, Tuple
 
 import pandas as pd
-from io_utils import read_file
+from utils import read_file
 
 
 def parse_args() -> argparse.Namespace:
