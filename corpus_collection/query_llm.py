@@ -5,8 +5,8 @@ from typing import Any, Iterator, List, Tuple
 import pandas as pd
 import torch
 from datasets import Dataset
-from io_utils import load_prompts
 from tqdm import tqdm
+from utils import format_output_df, load_prompts, process_answer
 from vllm import LLM, SamplingParams
 
 
@@ -101,20 +101,9 @@ def generate_batched_responses(
     return all_responses
 
 
-def process_answer(answer: str, prompt_number: int, response_number: int) -> str:
-    """Process the generated answer from the LLM."""
-    if "THE END!" in answer:
-        answer = answer.split("THE END!")[0]
-    else:
-        raise Warning(
-            f"THE END! not found for prompt {prompt_number} and response {response_number}"
-        )
-    return answer.strip()
-
-
 def process_responses(
     responses: List[Any], prompts: List[str], num_responses_per_prompt: int
-) -> List[List[str]]:
+) -> List[Tuple[str, List[str]]]:
     """Process the responses from the LLM."""
     all_answers = []
     for k, (response, prompt) in enumerate(zip(responses, prompts)):
@@ -124,7 +113,7 @@ def process_responses(
                 answer.append("NOT FOUND")
                 continue
             answer.append(process_answer(response.outputs[i].text, k, i))
-        all_answers.append([prompt, answer])
+        all_answers.append((prompt, answer))
     return all_answers
 
 
@@ -143,24 +132,6 @@ def generate_responses(
     return processed_responses
 
 
-def format_output_df(
-    prompts_df: pd.DataFrame, results: List[List[str]], n: int
-) -> pd.DataFrame:
-    """Add responses to the output dataframe."""
-    for i in range(n):
-        prompts_df[f"response_{i}"] = None
-    for i, row in prompts_df.iterrows():
-        prompt_from_df = row["prompt"].strip()
-        if i >= len(results):
-            continue
-        [prompt_from_results, responses] = results[i]
-        assert prompt_from_df == prompt_from_results
-        assert len(responses) == n
-        for j in range(n):
-            prompts_df.at[i, f"response_{j}"] = responses[j]
-    return prompts_df
-
-
 def load_llm(
     model: str,
     tensor_parallel_size: int,
@@ -175,7 +146,7 @@ def load_llm(
         n=num_responses_per_prompt,
     )
 
-    if "llama" in model.lower():
+    if "llama" in model.lower() or "gemma" in model.lower():
         llm = LLM(
             model=model,
             enable_prefix_caching=True,
