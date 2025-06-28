@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import pandas as pd
 
 
@@ -38,3 +40,32 @@ def load_prompts(
     prompts_df.reset_index(drop=True, inplace=True)
 
     return prompts_df, start_index, end_index
+
+
+def format_output_df(
+    prompts_df: pd.DataFrame, results: List[Tuple[str, List[str]]], n: int
+) -> pd.DataFrame:
+    """Add responses to the output dataframe."""
+    for i in range(n):
+        prompts_df[f"response_{i}"] = None
+    for i, row in prompts_df.iterrows():
+        prompt_from_df = row["prompt"].strip()
+        if i >= len(results):
+            continue
+        (prompt_from_results, responses) = results[i]
+        assert prompt_from_df == prompt_from_results
+        assert len(responses) == n
+        for j in range(n):
+            prompts_df.at[i, f"response_{j}"] = responses[j]
+    return prompts_df
+
+
+def process_answer(answer: str, prompt_number: int, response_number: int) -> str:
+    """Process the generated answer from the LLM."""
+    if "THE END!" in answer:
+        answer = answer.split("THE END!")[0]
+    else:
+        print(
+            f"THE END! not found for prompt {prompt_number} and response {response_number}"
+        )
+    return answer.strip()
