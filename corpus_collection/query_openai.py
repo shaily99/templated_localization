@@ -10,7 +10,7 @@ import pandas as pd
 from datasets import Dataset
 from openai import AsyncOpenAI
 from tqdm.asyncio import tqdm_asyncio
-from utils import format_output_df, load_prompts, process_answer
+from utils import format_response_df, load_prompts, process_answer
 
 # Reference:
 # https://github.com/zeno-ml/zeno-build/blob/3a5dcb2ed8bfdeec0dd2bacf2bea76673399824d/zeno_build/models/providers/openai_utils.py#L118
@@ -249,7 +249,7 @@ def main() -> None:
         args.num_responses_per_prompt,
     )
 
-    results_df = format_output_df(prompts_df, results, args.num_responses_per_prompt)
+    results_df = format_response_df(prompts_df, results, args.num_responses_per_prompt)
     print(f"Results dataframe: {results_df.head()}")
     dataset = Dataset.from_pandas(results_df)
     print(f"Generated dataset length: {len(dataset)}")

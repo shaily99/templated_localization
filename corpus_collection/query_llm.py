@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from datasets import Dataset
 from tqdm import tqdm
-from utils import format_output_df, load_prompts, process_answer
+from utils import format_response_df, load_prompts, process_answer
 from vllm import LLM, SamplingParams
 
 
@@ -203,7 +203,7 @@ def main() -> None:
         prompts, llm, sampling_params, args.batch_size, args.num_responses_per_prompt
     )
 
-    prompts_df = format_output_df(
+    prompts_df = format_response_df(
         prompts_df, processed_responses, args.num_responses_per_prompt
     )
 

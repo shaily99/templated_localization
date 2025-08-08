@@ -42,7 +42,7 @@ def load_prompts(
     return prompts_df, start_index, end_index
 
 
-def format_output_df(
+def format_response_df(
     prompts_df: pd.DataFrame, results: List[Tuple[str, List[str]]], n: int
 ) -> pd.DataFrame:
     """Add responses to the output dataframe."""
