@@ -14,22 +14,40 @@ from utils import load_responses
 def parse_args():
     parser = argparse.ArgumentParser(description="Create templates")
     parser.add_argument(
-        "--tokenized_input_file", help="Path to input dataset file", required=True
+        "--tokenized_input_file",
+        help="Path to input dataset file",
+        required=True,
+        type=str,
     )
-    parser.add_argument("--output_file", help="Path to output file", required=True)
     parser.add_argument(
-        "--n", help="Number of tokenized columns to process (0 to n-1)", default=5
+        "--output_file", help="Path to output file", required=True, type=str
     )
-    parser.add_argument("--npmi_file", help="Path to npmi file", required=True)
     parser.add_argument(
-        "--percentage_threshold", help="Percentage threshold for templates", default=0.0
+        "--n",
+        help="Number of tokenized columns to process (0 to n-1)",
+        default=5,
+        type=int,
     )
-    parser.add_argument("--compress", action="store_true", default=False)
+    parser.add_argument(
+        "--npmi_file", help="Path to npmi file", required=True, type=str
+    )
+    parser.add_argument(
+        "--percentage_threshold",
+        help="Percentage threshold for templates",
+        default=0.0,
+        type=int,
+    )
+    parser.add_argument(
+        "--compress",
+        action="store_true",
+        default=False,
+        help="Whether to compress the masked responses by removing consecutive mask tokens",
+    )
     parser.add_argument("--randomize", action="store_true", default=False)
     parser.add_argument(
         "--random_seed", help="Random seed. Used only if randomize is True.", default=47
     )
-    parser.add_argument("--mask_token", help="Mask token", default="[MASK]")
+    parser.add_argument("--mask_token", help="Mask token", default="[MASK]", type=str)
 
     args = parser.parse_args()
     return args
@@ -66,10 +84,13 @@ def mask_country_nationality(masked_response, nationality, mask_token="[MASK]"):
     # print("sequences_to_mask: ", sequences_to_mask)
 
     # Work with lowercase version for matching
-    masked_response_lower = [
-        token.lower() if token != mask_token else token for token in masked_response
-    ]
-    result_response = masked_response.copy()
+    masked_response_lower = []
+    for token in masked_response:
+        if token == mask_token:
+            masked_response_lower.append(mask_token)
+        else:
+            masked_response_lower.append(token.lower())
+    result_response = masked_response_lower.copy()
 
     # For each sequence, find and replace in the response
     for sequence in sequences_to_mask:
@@ -121,7 +142,7 @@ def compress_masked_response(response):
 def mask_response(response, masking_words, mask_token="[MASK]"):
     masked_response = []
     for word in response:
-        word = word.lower()
+        word = word.lower() if word != mask_token else word
         if word in string.punctuation:
             masked_response.append(word)
         else:
@@ -136,7 +157,7 @@ def mask_response(response, masking_words, mask_token="[MASK]"):
 def create_templates(
     tokenized_data, masking_words, n, compress=False, mask_token="[MASK]"
 ):
-    for example in tokenized_data:
+    def process_example(example):
         nationality = example["nationality"]
         for i in range(n):
             masked_response = example[f"tokenized_response_{i}"]
@@ -159,7 +180,9 @@ def create_templates(
 
             example[f"masked_response_{i}"] = masked_response
 
-    return tokenized_data
+        return example
+
+    return tokenized_data.map(process_example)
 
 
 def drop_tokenized_responses(tokenized_data, n):
@@ -169,6 +192,7 @@ def drop_tokenized_responses(tokenized_data, n):
 
 def main():
     args = parse_args()
+    print(f"Args: {args}")
     tokenized_data = load_responses(args.tokenized_input_file)
     npmi = json.load(open(args.npmi_file))
     # print(f"Num countries in npmi: {len(npmi)}")
@@ -176,7 +200,7 @@ def main():
     # print("NPMIs: ", npmi.keys())
     # print("COUNTRIES: ", COUNTRIES)
     # assert len(npmi) == len(COUNTRIES)
-    masking_words = get_masking_words(npmi, args.percentage_threshold)
+    masking_words = get_masking_words(npmi, float(args.percentage_threshold))
     print(f"Masking words: {masking_words}")
     masked_data = create_templates(
         tokenized_data=tokenized_data,
