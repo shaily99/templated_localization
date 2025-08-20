@@ -58,7 +58,7 @@ def get_masking_words(npmi, percentage_threshold):
     for nationality, word_npmi in npmi.items():
         words = list(word_npmi.keys())
         num_words = len(words)
-        num_words_to_mask = int(num_words * percentage_threshold)
+        num_words_to_mask = int((num_words * percentage_threshold) / 100)
         words_to_mask = words[:num_words_to_mask]
         masking_words[nationality] = words_to_mask
     return masking_words
@@ -200,8 +200,8 @@ def main():
     # print("NPMIs: ", npmi.keys())
     # print("COUNTRIES: ", COUNTRIES)
     # assert len(npmi) == len(COUNTRIES)
-    masking_words = get_masking_words(npmi, float(args.percentage_threshold))
-    print(f"Masking words: {masking_words}")
+    masking_words = get_masking_words(npmi, args.percentage_threshold)
+    # print(f"Masking words: {masking_words}")
     masked_data = create_templates(
         tokenized_data=tokenized_data,
         masking_words=masking_words,
@@ -211,6 +211,7 @@ def main():
     )
     masked_data = drop_tokenized_responses(masked_data, args.n)
     print(f"Masked data: {masked_data}")
+    del tokenized_data
     masked_data.save_to_disk(args.output_file)
     print(f"Saved masked data to {args.output_file}")
     print(masked_data["masked_response_0"][0])
