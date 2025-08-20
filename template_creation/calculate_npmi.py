@@ -16,8 +16,15 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Calculate NPMI between words and nationalities"
     )
-    parser.add_argument("--input_file", help="Path to input dataset file")
-    parser.add_argument("--output_file", help="Path to output JSON file")
+    parser.add_argument(
+        "--input_file",
+        help="Path to input dataset file. use tokenized responses",
+        required=True,
+        type=str,
+    )
+    parser.add_argument(
+        "--output_file", help="Path to output JSON file", required=True, type=str
+    )
     parser.add_argument(
         "--n",
         type=int,
