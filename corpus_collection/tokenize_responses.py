@@ -2,11 +2,9 @@ import argparse
 import re
 import sys
 
-from nltk.tokenize import word_tokenize
-
 sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
 
-from utils import load_responses
+from utils import load_responses, tokenize_text
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,33 +28,6 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-def replace_unicode_punct(text):
-    # Replace common Unicode punctuation with ASCII equivalents
-    replacements = {
-        "\u2013": "-",  # en dash
-        "\u2014": "--",  # em dash
-        "\u2015": "---",  # horizontal bar
-        "\u2018": "'",  # left single quotation
-        "\u2019": "'",  # right single quotation
-        "\u201c": '"',  # left double quotation
-        "\u201d": '"',  # right double quotation
-        "\u2026": "...",  # horizontal ellipsis
-    }
-
-    for unicode_char, ascii_char in replacements.items():
-        text = text.replace(unicode_char, ascii_char)
-
-    return text
-
-
-def tokenize_text(text: str) -> list:
-    """Tokenize text using NLTK word_tokenize."""
-    if text is None or text == "":
-        return []
-    text = replace_unicode_punct(text)
-    return word_tokenize(text)
 
 
 def process_dataset(dataset, n: int):

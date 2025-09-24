@@ -37,15 +37,6 @@ def parse_args():
     return args
 
 
-def clean_word(word):
-    """Remove punctuation from word and convert to lowercase."""
-    if not word:
-        return None
-    # Remove punctuation and convert to lowercase
-    cleaned = word.translate(str.maketrans("", "", string.punctuation)).lower().strip()
-    return cleaned if cleaned else None
-
-
 def calculate_npmi(dataset, n_columns):
     """
     Calculate NPMI between words and nationalities.
@@ -87,11 +78,11 @@ def calculate_npmi(dataset, n_columns):
 
         # Clean and process words
         for word in all_words:
-            cleaned_word = clean_word(word)
-            if cleaned_word:  # Skip empty/punctuation-only words
+            # cleaned_word = clean_word(word)
+            if word:  # Skip empty/punctuation-only words
                 # Update counts
-                word_nationality_count[(cleaned_word, nationality)] += 1
-                word_count[cleaned_word] += 1
+                word_nationality_count[(word, nationality)] += 1
+                word_count[word] += 1
                 nationality_count[nationality] += 1
                 total_word_count += 1
 
