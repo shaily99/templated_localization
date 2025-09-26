@@ -1,8 +1,10 @@
 import argparse
 import json
+import os
 import sys
 
 import editdistance as ed
+from joblib import Parallel, delayed
 
 sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
 
@@ -67,6 +69,7 @@ def reformat_data(data, topic_keys):
         if topic not in responses:
             responses[topic] = {}
         nationality = example["nationality"]
+        assert nationality not in responses[topic]
         responses[topic][nationality] = []
         for i in range(5):
             response_key = f"masked_response_{i}"
@@ -75,31 +78,55 @@ def reformat_data(data, topic_keys):
     return responses
 
 
+def process_single_topic(topic, topic_data, nationalities, similarity_fn):
+    """Process a single topic and return its results."""
+    topic_result = {}
+
+    for i in range(len(nationalities)):
+        nationality1 = nationalities[i]
+        for j in range(i, len(nationalities)):
+            nationality2 = nationalities[j]
+
+            if nationality1 not in topic_result:
+                topic_result[nationality1] = {}
+            if nationality2 not in topic_result:
+                topic_result[nationality2] = {}
+
+            responses1 = topic_data[nationality1]
+            responses2 = topic_data[nationality2]
+
+            assert len(responses1) == len(responses2) == 5
+
+            similarity_score = similarity_fn(responses1, responses2)
+            topic_result[nationality1][nationality2] = similarity_score
+            topic_result[nationality2][nationality1] = similarity_score
+
+    return topic, topic_result
+
+
 def main(data, nationalities, similarity_fn, topic_keys):
     reformatted_data = reformat_data(data, topic_keys)
+    delayed_runs = [
+        delayed(process_single_topic)(
+            topic=topic,
+            topic_data=reformatted_data[topic],
+            nationalities=nationalities,
+            similarity_fn=similarity_fn,
+        )
+        for topic in topic_keys
+    ]
+    results_list = Parallel(
+        n_jobs=len(os.sched_getaffinity(0)), backend="multiprocessing", verbose=0
+    )(
+        tqdm(
+            delayed_runs,
+            desc=f"Processing topics with {len(os.sched_getaffinity(0))} cores: ",
+            total=len(topic_keys),
+        )
+    )
     result = {}
-    for topic in tqdm(reformatted_data, total=len(reformatted_data), desc="Topic: "):
-        if topic not in result:
-            result[topic] = {}
-        for i in tqdm(
-            range(len(nationalities)), total=len(nationalities), desc="Nationality: "
-        ):
-            nationality1 = nationalities[i]
-            for j in range(i, len(nationalities)):
-                nationality2 = nationalities[j]
-                if nationality1 not in result[topic]:
-                    result[topic][nationality1] = {}
-                if nationality2 not in result[topic]:
-                    result[topic][nationality2] = {}
-
-                responses1 = reformatted_data[topic][nationality1]
-                responses2 = reformatted_data[topic][nationality2]
-
-                assert len(responses1) == len(responses2) == 5
-
-                similarity_score = similarity_fn(responses1, responses2)
-                result[topic][nationality1][nationality2] = similarity_score
-                result[topic][nationality2][nationality1] = similarity_score
+    for topic, topic_result in results_list:
+        result[topic] = topic_result
     return result
 
 
