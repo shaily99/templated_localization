@@ -4,6 +4,7 @@ import os
 import sys
 
 import editdistance as ed
+import evaluate
 from joblib import Parallel, delayed
 
 sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
@@ -11,6 +12,8 @@ sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
 from tqdm import tqdm
 
 from utils import load_responses
+
+_bleu = evaluate.load("bleu")
 
 
 def parse_args():
@@ -57,6 +60,25 @@ def wer(responses1, responses2):
             scores.append((score1 + score2) / 2)
 
     return sum(scores) / len(scores) if scores else 0.0
+
+
+def bleu(responses1, responses2):
+    predictions = []
+    references = []
+    for r1 in responses1:
+        prediction = " ".join(r1)
+        candidates = []
+        for r2 in responses2:
+            if r1 == r2:
+                continue
+            candidates.append(" ".join(r2))
+        if candidates:
+            predictions.append(prediction)
+            references.append(candidates)
+    if not predictions:
+        return 0.0
+    results = _bleu.compute(predictions=predictions, references=references)
+    return results["bleu"]
 
 
 def reformat_data(data, topic_keys):
@@ -162,8 +184,7 @@ if __name__ == "__main__":
     if args.metric == "wer":
         similarity_fn = wer
     elif args.metric == "bleu":
-        # similarity_fn = bleu
-        raise NotImplementedError("BLEU metric not implemented yet.")
+        similarity_fn = bleu
 
     results = main(data, nationalities, similarity_fn, topic_keys)
     print(f"Output path: {output_path}")
