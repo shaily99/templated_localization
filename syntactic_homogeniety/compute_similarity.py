@@ -4,7 +4,7 @@ import os
 import sys
 
 import editdistance as ed
-import evaluate
+import sacrebleu
 from joblib import Parallel, delayed
 
 sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
@@ -12,8 +12,6 @@ sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
 from tqdm import tqdm
 
 from utils import load_responses
-
-_bleu = evaluate.load("bleu")
 
 
 def parse_args():
@@ -53,8 +51,6 @@ def wer(responses1, responses2):
     scores = []
     for r1 in responses1:
         for r2 in responses2:
-            if r1 == r2:
-                continue
             score1 = _wer(r1, r2)
             score2 = _wer(r2, r1)
             scores.append((score1 + score2) / 2)
@@ -63,22 +59,52 @@ def wer(responses1, responses2):
 
 
 def bleu(responses1, responses2):
-    predictions = []
-    references = []
-    for r1 in responses1:
-        prediction = " ".join(r1)
-        candidates = []
-        for r2 in responses2:
-            if r1 == r2:
+    scores = []
+    references2 = []
+    for r2 in responses2:
+        if len(r2) > 0:
+            ref = " ".join(r2).strip()
+            references2.append(ref)
+        else:
+            continue
+
+    if references2:
+        for r1 in responses1:
+            if len(r1) > 0:
+                hypothesis = " ".join(r1).strip()
+                try:
+                    bleu_score = sacrebleu.sentence_bleu(
+                        hypothesis, references2, tokenize="none"
+                    )
+                    scores.append(bleu_score.score / 100.0)
+                except Exception as e:
+                    print(f"Error computing BLEU (dir1): {e}")
+                    continue
+            else:
                 continue
-            candidates.append(" ".join(r2))
-        if candidates:
-            predictions.append(prediction)
-            references.append(candidates)
-    if not predictions:
-        return 0.0
-    results = _bleu.compute(predictions=predictions, references=references)
-    return results["bleu"]
+    references1 = []
+    for r1 in responses1:
+        if len(r1) > 0:
+            ref = " ".join(r1).strip()
+            references1.append(ref)
+        else:
+            continue
+
+    if references1:
+        for r2 in responses2:
+            if len(r2) > 0:
+                hypothesis = " ".join(r2).strip()
+                try:
+                    bleu_score = sacrebleu.sentence_bleu(
+                        hypothesis, references1, tokenize="none"
+                    )
+                    scores.append(bleu_score.score / 100.0)
+                except Exception as e:
+                    print(f"Error computing BLEU (dir2): {e}")
+                    continue
+            else:
+                continue
+    return sum(scores) / len(scores) if scores else 0.0
 
 
 def reformat_data(data, topic_keys):
@@ -106,7 +132,7 @@ def process_single_topic(topic, topic_data, nationalities, similarity_fn):
 
     for i in range(len(nationalities)):
         nationality1 = nationalities[i]
-        for j in range(i, len(nationalities)):
+        for j in range(i + 1, len(nationalities)):
             nationality2 = nationalities[j]
 
             if nationality1 not in topic_result:
@@ -128,6 +154,7 @@ def process_single_topic(topic, topic_data, nationalities, similarity_fn):
 
 def main(data, nationalities, similarity_fn, topic_keys):
     reformatted_data = reformat_data(data, topic_keys)
+    n_jobs = len(os.sched_getaffinity(0))
     delayed_runs = [
         delayed(process_single_topic)(
             topic=topic,
@@ -137,12 +164,15 @@ def main(data, nationalities, similarity_fn, topic_keys):
         )
         for topic in topic_keys
     ]
+
     results_list = Parallel(
-        n_jobs=len(os.sched_getaffinity(0)), backend="multiprocessing", verbose=0
+        n_jobs=n_jobs,
+        backend="multiprocessing",
+        verbose=1,
     )(
         tqdm(
             delayed_runs,
-            desc=f"Processing topics with {len(os.sched_getaffinity(0))} cores: ",
+            desc=f"Processing topics with {n_jobs} cores: ",
             total=len(topic_keys),
         )
     )
@@ -178,7 +208,6 @@ if __name__ == "__main__":
     print(f"Number of topics to process: {len(topic_keys)}")
     print(f"Topics to process: {topic_keys}")
 
-    # data = data.filter(lambda x: x["topic"] in topic_keys)
     nationalities = list(set(data["nationality"]))
     nationalities = sorted(nationalities)
     if args.metric == "wer":
