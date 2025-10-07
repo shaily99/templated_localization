@@ -1,13 +1,15 @@
 import argparse
 import json
 import math
-import string
 import sys
 from collections import defaultdict
+import os
 
 from tqdm import tqdm
 
-sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
+HOME = os.path.expanduser("~")
+
+sys.path.insert(0, f"{HOME}/converging_cultural_narratives")
 
 from utils import load_responses
 
