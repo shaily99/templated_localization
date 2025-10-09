@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import random
 import sys
 
 import torch
@@ -14,7 +15,9 @@ from transformers import (
     TrainingArguments,
 )
 
-sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
+HOME = os.path.expanduser("~")
+
+sys.path.insert(0, f"{HOME}/converging_cultural_narratives")
 
 import utils
 
@@ -67,18 +70,18 @@ def parse_args():
         "--seed", type=int, default=47, help="Random seed for reproducibility."
     )
     parser.add_argument(
-        "--learning_rate", type=float, default=1e-3, help="Learning rate for training."
+        "--learning_rate", type=float, default=3e-5, help="Learning rate for training."
     )
     parser.add_argument(
         "--batch_size", type=int, default=8, help="Batch size for training."
     )
     parser.add_argument(
-        "--num_epochs", type=int, default=5, help="Number of training epochs."
+        "--num_epochs", type=int, default=50, help="Number of training epochs."
     )
     parser.add_argument(
         "--early_stopping_patience",
         type=int,
-        default=2,
+        default=3,
         help="Early stopping patience.",
     )
     parser.add_argument(
@@ -95,7 +98,7 @@ def parse_args():
     parser.add_argument(
         "--wandb_project",
         type=str,
-        default="culture-bias-country-classification-mmbert",
+        default="culture-bias-mmbert",
         help="wandb project name",
     )
     parser.add_argument(
@@ -105,18 +108,6 @@ def parse_args():
         help="Optional run name for wandb",
     )
     return parser.parse_args()
-
-
-def convert_to_serializable(obj):
-    if isinstance(obj, dict):
-        return {k: convert_to_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [convert_to_serializable(item) for item in obj]
-    elif hasattr(obj, "item"):
-        return obj.item()
-    elif torch.is_tensor(obj):
-        return obj.cpu().numpy().tolist()
-    return obj
 
 
 def main(
@@ -129,7 +120,7 @@ def main(
 ):
 
     num_labels = len(set(train_data["label"]))
-    print(f"Number of labels: {num_labels}")
+    logger.info(f"Number of labels: {num_labels}")
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name, num_labels=num_labels
@@ -137,22 +128,24 @@ def main(
 
     training_args_obj = TrainingArguments(
         output_dir=output_dir,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
-        learning_rate=training_args.get("learning_rate", 1e-3),
+        learning_rate=training_args.get("learning_rate", 3e-5),
         per_device_train_batch_size=training_args.get("batch_size", 8),
         per_device_eval_batch_size=training_args.get("batch_size", 8),
         num_train_epochs=training_args.get("num_epochs", 5),
         logging_dir=f"{output_dir}/logs",
         logging_steps=10,
         load_best_model_at_end=True,
-        metric_for_best_model="f1",
+        metric_for_best_model="avg_f1_weighted",
         seed=training_args.get("seed", 47),
         save_total_limit=3,
         fp16=training_args.get("fp16", False),
         gradient_accumulation_steps=training_args.get("gradient_accumulation_steps", 1),
-        report_to=["wandb"],  # <<< enable wandb logging
-        run_name=training_args.get("wandb_run_name"),  # <<< optional name in UI
+        report_to=["wandb"],
+        run_name=training_args.get("wandb_run_name"),
+        max_grad_norm=1.0,
+        warmup_steps=training_args.get("warmup_steps", 500),
     )
 
     trainer = Trainer(
@@ -160,7 +153,7 @@ def main(
         args=training_args_obj,
         train_dataset=train_data,
         eval_dataset=val_data,
-        compute_metrics=utils.f1_score,
+        compute_metrics=utils.compute_f1_score,
         callbacks=[
             EarlyStoppingCallback(
                 early_stopping_patience=training_args.get("early_stopping_patience", 2)
@@ -168,14 +161,14 @@ def main(
         ],
     )
 
-    print("Starting training...")
+    logger.info("Starting training...")
     trainer.train()
-    print("Training completed.")
+    logger.info("Training completed.")
 
-    print("Evaluating on validation set...")
+    logger.info("Evaluating on validation set...")
     val_report = trainer.evaluate(eval_dataset=val_data)
 
-    print("Evaluating on test set...")
+    logger.info("Evaluating on test set...")
     test_report = trainer.evaluate(eval_dataset=test_data)
 
     return val_report, test_report, trainer
@@ -200,13 +193,31 @@ if __name__ == "__main__":
 
     logger = logging.getLogger(__name__)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"{'='*60}")
+    logger.info("DEVICE INFORMATION")
+    logger.info(f"{'='*60}")
+    logger.info(f"Using device: {device}")
+
+    if torch.cuda.is_available():
+        logger.info(f"GPU Device: {torch.cuda.get_device_name(0)}")
+        logger.info(f"Number of GPUs available: {torch.cuda.device_count()}")
+        logger.info(f"CUDA Version: {torch.version.cuda}")
+        logger.info(
+            f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB"
+        )
+    else:
+        logger.info("No GPU available, using CPU")
+
+    logger.info(f"PyTorch Version: {torch.__version__}")
+    logger.info(f"{'='*60}\n")
+
     logger.info(f"Args: {args}")
     logger.info(f"Val column: {args.val_column}")
     logger.info(f"Test column: {args.test_column}")
     logger.info(f"Output dir: {output_dir}")
     logger.info(f"Model: {args.base_model}")
 
-    # --- initialize wandb before training ---
     wandb.init(
         project=args.wandb_project,
         name=args.wandb_run_name,
@@ -225,7 +236,14 @@ if __name__ == "__main__":
     )
 
     data = utils.load_responses(args.tokenized_responses)
+
+    # # for testing
+    # random_indices = random.sample(range(len(data)), 3000)
+    # data = [data[i] for i in random_indices]
+
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
+
+    logger.info("Creating val split...")
 
     val_data = utils.create_data_split(
         data=data,
@@ -234,6 +252,9 @@ if __name__ == "__main__":
         max_length=args.max_length,
         seed=args.seed,
     )
+
+    logger.info("Creating test split...")
+
     test_data = utils.create_data_split(
         data=data,
         column_indices=[args.test_column],
@@ -241,6 +262,9 @@ if __name__ == "__main__":
         max_length=args.max_length,
         seed=args.seed,
     )
+
+    logger.info("Creating train split...")
+
     train_column_indices = [
         i
         for i in range(args.num_responses)
@@ -258,6 +282,15 @@ if __name__ == "__main__":
     logger.info(f"Train samples: {len(train_data)}")
     logger.info(f"Val samples: {len(val_data)}")
     logger.info(f"Test samples: {len(test_data)}")
+
+    logger.info("Validating label mapping...")
+    all_train_labels = set(train_data["label"])
+    for label_idx in all_train_labels:
+        nationality = utils.get_nationality_of_index(int(label_idx))
+        if nationality == "NOT FOUND":
+            logger.warning(
+                f"Warning: Label index {label_idx} has no nationality mapping!"
+            )
 
     num_labels = len(set(train_data["label"]))
     logger.info(f"Number of labels: {num_labels}")
@@ -282,23 +315,57 @@ if __name__ == "__main__":
         training_args=training_args_dict,
     )
 
-    logger.info("\n--- Validation Report ---")
+    logger.info("\n--- Validation Report (from Trainer) ---")
     logger.info(val_report)
 
-    logger.info("\n--- Test Report ---")
+    logger.info("\n--- Test Report (from Trainer) ---")
     logger.info(test_report)
 
+    # Generate detailed reports with per-class metrics
+    logger.info("\n--- Generating Detailed Reports ---")
+
+    val_detailed, val_metrics_df = utils.create_report(trainer, val_data)
+    test_detailed, test_metrics_df = utils.create_report(trainer, test_data)
+
+    logger.info(f"\n{'='*60}")
+    logger.info("VALIDATION PER-CLASS F1 SCORES")
+    logger.info(f"{'='*60}")
+    for nationality, metrics in sorted(
+        val_detailed["per_class_metrics"].items(),
+        key=lambda x: x[1]["f1-score"],
+        reverse=True,
+    ):
+        logger.info(
+            f"{nationality:20s}: F1={metrics['f1-score']:.4f}, "
+            f"Precision={metrics['precision']:.4f}, "
+            f"Recall={metrics['recall']:.4f}, "
+            f"Support={int(metrics['support'])}"
+        )
+
+    logger.info(f"\n{'='*60}")
+    logger.info("TEST PER-CLASS F1 SCORES")
+    logger.info(f"{'='*60}")
+    for nationality, metrics in sorted(
+        test_detailed["per_class_metrics"].items(),
+        key=lambda x: x[1]["f1-score"],
+        reverse=True,
+    ):
+        logger.info(
+            f"{nationality:20s}: F1={metrics['f1-score']:.4f}, "
+            f"Precision={metrics['precision']:.4f}, "
+            f"Recall={metrics['recall']:.4f}, "
+            f"Support={int(metrics['support'])}"
+        )
+
+    # Save model and tokenizer
     trainer.save_model(f"{output_dir}/best_model")
     tokenizer.save_pretrained(f"{output_dir}/best_model")
     logger.info(f"Best model saved to {output_dir}/best_model")
 
-    val_report_serializable = convert_to_serializable(val_report)
-    test_report_serializable = convert_to_serializable(test_report)
-
     with open(f"{output_dir}/val_report.json", "w") as f:
-        json.dump(val_report_serializable, f, indent=2)
+        json.dump(val_report, f, indent=2, default=float)
     with open(f"{output_dir}/test_report.json", "w") as f:
-        json.dump(test_report_serializable, f, indent=2)
+        json.dump(test_report, f, indent=2, default=float)
 
     metadata = {
         "base_model": args.base_model,
@@ -314,7 +381,19 @@ if __name__ == "__main__":
         "test_column": args.test_column,
     }
     with open(f"{output_dir}/metadata.json", "w") as f:
-        json.dump(convert_to_serializable(metadata), f, indent=2)
+        json.dump(metadata, f, indent=2, default=float)
 
+    logger.info(f"\n{'='*60}")
+    logger.info("SUMMARY")
+    logger.info(f"{'='*60}")
+    logger.info(f"Overall Validation F1: {val_report.get('eval_f1', 0):.4f}")
+    logger.info(f"Overall Test F1: {test_report.get('eval_f1', 0):.4f}")
     logger.info(f"\nAll results saved to {output_dir}")
+    logger.info(f"  - validation_detailed_report.json")
+    logger.info(f"  - validation_per_class_metrics.csv")
+    logger.info(f"  - test_detailed_report.json")
+    logger.info(f"  - test_per_class_metrics.csv")
+    logger.info(f"  - best_model/")
+
+    wandb.finish()
     wandb.finish()
