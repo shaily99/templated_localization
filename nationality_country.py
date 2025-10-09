@@ -193,3 +193,17 @@ nationality_to_country = {
     "Zambian": "Zambia",
     "Zimbabwean": "Zimbabwe",
 }
+
+nationalities = sorted(list(nationality_to_country.keys()))
+
+nationality_index = {nat: idx for idx, nat in enumerate(nationalities)}
+
+
+def get_index_of_nationality(nationality):
+    return nationality_index.get(nationality, -1)
+
+
+def get_nationality_of_index(index):
+    if 0 <= index < len(nationalities):
+        return nationalities[index]
+    return "NOT FOUND"
