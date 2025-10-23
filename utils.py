@@ -116,6 +116,10 @@ def create_report(trainer, dataset):
     all_labels = sorted(np.unique(np.concatenate([labels, predictions])))
     label_names = [get_nationality_of_index(int(idx)) for idx in all_labels]
 
+    f1_weighted = f1_score(labels, predictions, average="weighted")
+    f1_micro = f1_score(labels, predictions, average="micro")
+    f1_macro = f1_score(labels, predictions, average="macro")
+
     report_dict = classification_report(
         labels,
         predictions,
@@ -134,21 +138,24 @@ def create_report(trainer, dataset):
     }
 
     detailed_report = {
+        "f1_weighted": f1_weighted,
+        "f1_micro": f1_micro,
+        "f1_macro": f1_macro,
         "classification_report": report_dict,
         "confusion_matrix": cm_with_labels,
-        "per_class_metrics": {},
+        # "per_class_metrics": {},
     }
 
-    for label_name in label_names:
-        if label_name in report_dict and label_name != "NOT FOUND":
-            detailed_report["per_class_metrics"][label_name] = {
-                "precision": report_dict[label_name]["precision"],
-                "recall": report_dict[label_name]["recall"],
-                "f1-score": report_dict[label_name]["f1-score"],
-                "support": report_dict[label_name]["support"],
-            }
+    # for label_name in label_names:
+    #     if label_name in report_dict and label_name != "NOT FOUND":
+    #         detailed_report["per_class_metrics"][label_name] = {
+    #             "precision": report_dict[label_name]["precision"],
+    #             "recall": report_dict[label_name]["recall"],
+    #             "f1-score": report_dict[label_name]["f1-score"],
+    #             "support": report_dict[label_name]["support"],
+    #         }
 
-    metrics_df = pd.DataFrame(detailed_report["per_class_metrics"]).T
-    metrics_df = metrics_df.sort_values("f1-score", ascending=False)
+    # metrics_df = pd.DataFrame(detailed_report["per_class_metrics"]).T
+    # metrics_df = metrics_df.sort_values("f1-score", ascending=False)
 
-    return detailed_report, metrics_df
+    return detailed_report
