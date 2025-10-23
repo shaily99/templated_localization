@@ -1,6 +1,7 @@
 eecc/*
 culture_bias/*
 old_code/*
+*wandb*
 *.tsv
 *.err
 *.log
