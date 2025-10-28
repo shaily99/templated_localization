@@ -143,19 +143,6 @@ def create_report(trainer, dataset):
         "f1_macro": f1_macro,
         "classification_report": report_dict,
         "confusion_matrix": cm_with_labels,
-        # "per_class_metrics": {},
     }
-
-    # for label_name in label_names:
-    #     if label_name in report_dict and label_name != "NOT FOUND":
-    #         detailed_report["per_class_metrics"][label_name] = {
-    #             "precision": report_dict[label_name]["precision"],
-    #             "recall": report_dict[label_name]["recall"],
-    #             "f1-score": report_dict[label_name]["f1-score"],
-    #             "support": report_dict[label_name]["support"],
-    #         }
-
-    # metrics_df = pd.DataFrame(detailed_report["per_class_metrics"]).T
-    # metrics_df = metrics_df.sort_values("f1-score", ascending=False)
 
     return detailed_report
