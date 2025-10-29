@@ -1,11 +1,14 @@
 import argparse
 import json
+import os
 import string
 import sys
 
 from nltk.tokenize import word_tokenize
 
-sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
+HOME = os.path.expanduser("~")
+
+sys.path.insert(0, f"{HOME}/converging_cultural_narratives")
 
 from nationality_country import nationality_to_country
 from utils import load_responses
