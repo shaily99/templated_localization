@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import random
 import string
 import sys
 
@@ -51,18 +52,21 @@ def parse_args():
         "--random_seed", help="Random seed. Used only if randomize is True.", default=47
     )
     parser.add_argument("--mask_token", help="Mask token", default="[MASK]", type=str)
-
     args = parser.parse_args()
     return args
 
 
-def get_masking_words(npmi, percentage_threshold):
+def get_masking_words(npmi, percentage_threshold, randomize=False, random_seed=47):
     masking_words = {}
     for nationality, word_npmi in npmi.items():
         words = list(word_npmi.keys())
         num_words = len(words)
         num_words_to_mask = int((num_words * percentage_threshold) / 100)
-        words_to_mask = words[:num_words_to_mask]
+        if not randomize:
+            words_to_mask = words[:num_words_to_mask]
+        else:
+            random.seed(random_seed)
+            words_to_mask = random.sample(words, num_words_to_mask)
         masking_words[nationality] = words_to_mask
     return masking_words
 
@@ -158,7 +162,11 @@ def mask_response(response, masking_words, mask_token="[MASK]"):
 
 
 def create_templates(
-    tokenized_data, masking_words, n, compress=False, mask_token="[MASK]"
+    tokenized_data,
+    masking_words,
+    n,
+    compress=False,
+    mask_token="[MASK]",
 ):
     def process_example(example):
         nationality = example["nationality"]
@@ -196,6 +204,9 @@ def drop_tokenized_responses(tokenized_data, n):
 def main():
     args = parse_args()
     print(f"Args: {args}")
+    if os.path.exists(args.output_file):
+        print(f"Output file {args.output_file} already exists. Exiting.")
+        return
     tokenized_data = load_responses(args.tokenized_input_file)
     npmi = json.load(open(args.npmi_file))
     # print(f"Num countries in npmi: {len(npmi)}")
@@ -203,7 +214,12 @@ def main():
     # print("NPMIs: ", npmi.keys())
     # print("COUNTRIES: ", COUNTRIES)
     # assert len(npmi) == len(COUNTRIES)
-    masking_words = get_masking_words(npmi, args.percentage_threshold)
+    masking_words = get_masking_words(
+        npmi=npmi,
+        percentage_threshold=args.percentage_threshold,
+        randomize=args.randomize,
+        random_seed=args.random_seed,
+    )
     # print(f"Masking words: {masking_words}")
     masked_data = create_templates(
         tokenized_data=tokenized_data,
