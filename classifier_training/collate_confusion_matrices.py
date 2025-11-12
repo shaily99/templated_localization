@@ -18,20 +18,20 @@ def parse_args():
         "--classifier_dir_add",
         type=str,
         default="",
-        options=["", "_with_nationality"],
+        choices=["", "_with_nationality"],
         help="Suffix to add to the directory names.",
     )
     parser.add_argument(
         "--template_add",
         type=str,
-        default="",
-        options=["", "_with_nationality"],
+        default="_with_nationality",
+        choices=["", "_with_nationality"],
         help="Additional string to add to the template name.",
     )
     parser.add_argument(
         "--random_seed",
         type=int,
-        default=47,
+        default=-1,
         help="Random seed used in the directory names.",
     )
     return parser.parse_args()
@@ -47,9 +47,9 @@ if __name__ == "__main__":
 
     classifier_dir_add = args.classifier_dir_add
     template_add = args.template_add
-    random_name = f"random_{args.random_seed}_"
+    random_name = f"random_{args.random_seed}_" if args.random_seed > 0 else ""
 
-    percentages = [f"0{template_add}"] + [str(i) for i in range(100)]
+    percentages = [str(i) for i in range(100)]
 
     cms = {}
     for percentage in tqdm(percentages):
@@ -70,9 +70,7 @@ if __name__ == "__main__":
                 cms[percentage] += cm
         cms[percentage] = cms[percentage].T.to_dict()
 
-    output_path = (
-        f"{base_dir}/{random_name}collated_confusion_matrix{classifier_dir_add}.json"
-    )
+    output_path = f"{base_dir}/{random_name}collated_confusion_matrix_classifier{classifier_dir_add}_template{template_add}.json"
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(cms, f, indent=2, ensure_ascii=False)
