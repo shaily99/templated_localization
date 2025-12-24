@@ -9,6 +9,8 @@ old_code/*
 *.sh
 *.ipynb
 *.txt
+*.pdf
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
