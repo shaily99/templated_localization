@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument(
         "--template_add",
         type=str,
-        default="_with_nationality",
+        default="",
         choices=["", "_with_nationality"],
         help="Additional string to add to the template name.",
     )
@@ -43,19 +43,30 @@ tests = [1, 2, 3, 4, 0]
 
 if __name__ == "__main__":
     args = parse_args()
+    print(args)
     base_dir = f"/data/group_data/starlight/culture_bias/classifiers/0.7/mmBERT-base/compressed_masked_responses/{args.model}"
 
     classifier_dir_add = args.classifier_dir_add
     template_add = args.template_add
     random_name = f"random_{args.random_seed}_" if args.random_seed > 0 else ""
 
-    percentages = [str(i) for i in range(100)]
+    percentages = (
+        [str(i) for i in range(100)]
+        if args.template_add == ""
+        else ["0_with_nationality"] + [str(i) for i in range(1, 100)]
+    )
 
     cms = {}
     for percentage in tqdm(percentages):
         for val, test in zip(vals, tests):
+            percentage_name = (
+                percentage
+                if "_with_nationaity" not in percentage
+                else percentage.replace("_with_nationality", "")
+            )
             dir = f"{base_dir}/val_{val}_test_{test}{classifier_dir_add}/{random_name}test_reports"
-            cm_path = f"{dir}/{percentage}{template_add}.json"
+            cm_path = f"{dir}/{percentage}.json"
+            # cm_path = f"{dir}/{percentage}{template_add}.json"
             report = json.load(open(cm_path, "r"))
             cm = pd.DataFrame(report["confusion_matrix"]["matrix"])
             cm.columns = report["confusion_matrix"]["labels"]
@@ -64,11 +75,12 @@ if __name__ == "__main__":
             cm.index = report["confusion_matrix"]["labels"]
             indices = [f"true_{label}" for label in cm.index]
             cm.index = indices
-            if percentage not in cms:
-                cms[percentage] = cm
+
+            if percentage_name not in cms:
+                cms[percentage_name] = cm
             else:
-                cms[percentage] += cm
-        cms[percentage] = cms[percentage].T.to_dict()
+                cms[percentage_name] += cm
+        cms[percentage_name] = cms[percentage_name].T.to_dict()
 
     output_path = f"{base_dir}/{random_name}collated_confusion_matrix_classifier{classifier_dir_add}_template{template_add}.json"
 
