@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument(
         "--template_add",
         type=str,
-        default="_with_nationality",
+        default="",
         choices=["", "_with_nationality"],
         help="Additional string to add to the template name.",
     )
@@ -158,6 +158,7 @@ if __name__ == "__main__":
     percentages = [str(i) for i in range(100)]
 
     args = parse_args()
+    print(args)
     model = args.model
     classifier_dir_add = args.classifier_dir_add
     template_add = args.template_add
@@ -170,7 +171,14 @@ if __name__ == "__main__":
     cms = json.load(open(cm_path, "r"))
     metrics = {}
     for percentage in tqdm(percentages):
-        cm = cms[percentage]
+        if percentage not in cms:
+            p = percentage + "_with_nationality"
+            if p in cms:
+                cm = cms[p]
+            else:
+                raise ValueError(f"Percentage {percentage} not found in cms.")
+        else:
+            cm = cms[percentage]
         per_class_metrics = confusion_matrix_to_metrics(cm)
         overall_metrics = calculate_overall_metrics(per_class_metrics)
         metrics[percentage] = {
