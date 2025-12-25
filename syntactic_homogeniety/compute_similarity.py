@@ -46,7 +46,11 @@ def parse_args():
 
 def wer(responses1, responses2):
     def _wer(pred, ref):
-        return ed.eval(pred, ref) / max(len(pred), len(ref))
+        return (
+            ed.eval(pred, ref) / max(len(pred), len(ref))
+            if max(len(pred), len(ref)) > 0
+            else 0.0
+        )
 
     scores = []
     for r1 in responses1:
@@ -206,7 +210,7 @@ if __name__ == "__main__":
     )
 
     print(f"Number of topics to process: {len(topic_keys)}")
-    print(f"Topics to process: {topic_keys}")
+    # print(f"Topics to process: {topic_keys}")
 
     nationalities = list(set(data["nationality"]))
     nationalities = sorted(nationalities)
@@ -214,8 +218,7 @@ if __name__ == "__main__":
         similarity_fn = wer
     elif args.metric == "bleu":
         similarity_fn = bleu
-
-    results = main(data, nationalities, similarity_fn, topic_keys)
     print(f"Output path: {output_path}")
+    results = main(data, nationalities, similarity_fn, topic_keys)
     with open(output_path, "w") as f:
         json.dump(results, f, indent=4)
