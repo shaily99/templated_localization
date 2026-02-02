@@ -1,9 +1,9 @@
 import argparse
 import json
 import math
+import os
 import sys
 from collections import defaultdict
-import os
 
 from tqdm import tqdm
 
@@ -128,7 +128,22 @@ def calculate_npmi(dataset, n_columns):
             sorted(word_scores.items(), key=lambda x: x[1], reverse=True)
         )
 
-    return sorted_results
+    return sorted_results, word_nationality_count
+
+
+def process_word_nationality_count(word_nationality_count):
+    counts = {}
+    for word, nationality in word_nationality_count.keys():
+        if nationality not in counts:
+            counts[nationality] = {}
+        counts[nationality][word] = word_nationality_count[(word, nationality)]
+    counts_sorted = {}
+    countries_sorted = sorted(counts.keys())
+    for country in countries_sorted:
+        counts_sorted[country] = dict(
+            sorted(counts[country].items(), key=lambda x: x[1], reverse=True)
+        )
+    return counts_sorted
 
 
 def main():
@@ -140,12 +155,17 @@ def main():
 
     # Calculate NPMI scores
     print(f"Processing {args.n} tokenized columns...")
-    npmi_results = calculate_npmi(dataset, args.n)
+    npmi_results, word_nationality_count = calculate_npmi(dataset, args.n)
 
     # Save results
     print(f"Saving results to {args.output_file}...")
     with open(args.output_file, "w") as f:
         json.dump(npmi_results, f, indent=2)
+
+    counts_output_file = args.output_file.replace(".json", "_counts.json")
+    print(f"Saving word nationality counts to {counts_output_file}...")
+    with open(counts_output_file, "w") as f:
+        json.dump(process_word_nationality_count(word_nationality_count), f, indent=2)
 
     print(f"NPMI calculation complete! Results saved to {args.output_file}")
     return npmi_results
