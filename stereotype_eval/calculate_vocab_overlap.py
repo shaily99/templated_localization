@@ -1,7 +1,12 @@
 import argparse
 import json
+import sys
 
 import pandas as pd
+
+sys.path.insert(0, "/home/shailyjb/converging_cultural_narratives")
+
+from utils import load_seegull_data
 
 
 def parse_args():
@@ -9,7 +14,7 @@ def parse_args():
     parser.add_argument(
         "--seegull_path",
         type=str,
-        default="/home/shailyjb/converging_cultural_narratives/stereotype_analysis/dataset/stereotypes_global_v2.csv",
+        default="/home/shailyjb/converging_cultural_narratives/stereotype_eval/dataset/stereotypes_global_v2.csv",
         help="Path to the Seegull dataset CSV file",
     )
     parser.add_argument(
@@ -27,29 +32,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_seegull_data(seegull_path):
-    df = pd.read_csv(seegull_path)
-    region_stereotypes = {}
-    na_stereotypes = {}
-    offensiveness_scores = {}
-    for _, row in df.iterrows():
-        country = row["identity"]
-        stereotype = row["attribute"].strip().lower()
-        region_stereo = int(row["region_stereo"])
-        na_stereo = int(row["NA_stereo"])
-        offensiveness = float(row["mean offensiveness_score"])
-        if country not in region_stereotypes:
-            region_stereotypes[country] = set()
-            na_stereotypes[country] = set()
-            offensiveness_scores[country] = {}
-        if region_stereo > 0:
-            region_stereotypes[country].add(stereotype)
-        if na_stereo > 0:
-            na_stereotypes[country].add(stereotype)
-        offensiveness_scores[country][stereotype] = offensiveness
-    return region_stereotypes, na_stereotypes, offensiveness_scores
-
-
 def load_vocab_data(vocab_path):
     with open(vocab_path, "r") as f:
         vocab_data = json.load(f)
@@ -63,11 +45,13 @@ def calculate_overlap(stereotypes, offensiveness, vocab_data):
     overlap_percentages = {}
     offensiveness_scores = {}
     for country in stereotypes:
+        if country not in vocab_data:
+            continue
         overlap_counts[country] = {}
         overlap_percentages[country] = {}
         offensiveness_scores[country] = {}
         stereo_set = stereotypes[country]
-        vocab = vocab_data.get(country, [])
+        vocab = vocab_data[country]
         for percentage in range(1, 101, 1):
             mean_score = 0
             top_n = int(len(vocab) * (percentage / 100))
@@ -90,9 +74,15 @@ def calculate_overlap(stereotypes, offensiveness, vocab_data):
 
 if __name__ == "__main__":
     args = parse_args()
-    region_stereotypes, na_stereotypes, offensiveness = load_seegull_data(
-        args.seegull_path
-    )
+    (
+        region_stereotypes,
+        na_stereotypes,
+        combined_stereotypes,
+        region_stereotypes_majority,
+        na_stereotypes_majority,
+        combined_stereotypes_majority,
+        offensiveness,
+    ) = load_seegull_data(args.seegull_path)
     vocab_data = load_vocab_data(args.vocab_path)
     (
         region_stereotype_overlap_counts,
@@ -104,6 +94,26 @@ if __name__ == "__main__":
         na_stereotype_overlap_percentages,
         na_offensiveness,
     ) = calculate_overlap(na_stereotypes, offensiveness, vocab_data)
+    (
+        combined_stereotype_overlap_counts,
+        combined_stereotype_overlap_percentages,
+        combined_offensiveness,
+    ) = calculate_overlap(combined_stereotypes, offensiveness, vocab_data)
+    (
+        region_stereotype_majority_overlap_counts,
+        region_stereotype_majority_overlap_percentages,
+        regional_majority_offensiveness,
+    ) = calculate_overlap(region_stereotypes_majority, offensiveness, vocab_data)
+    (
+        na_stereotype_majority_overlap_counts,
+        na_stereotype_majority_overlap_percentages,
+        na_majority_offensiveness,
+    ) = calculate_overlap(na_stereotypes_majority, offensiveness, vocab_data)
+    (
+        combined_stereotype_majority_overlap_counts,
+        combined_stereotype_majority_overlap_percentages,
+        combined_majority_offensiveness,
+    ) = calculate_overlap(combined_stereotypes_majority, offensiveness, vocab_data)
     stereotype_data = {
         "regional": {
             "overlap_counts": region_stereotype_overlap_counts,
@@ -114,6 +124,26 @@ if __name__ == "__main__":
             "overlap_counts": na_stereotype_overlap_counts,
             "overlap_percentages": na_stereotype_overlap_percentages,
             "offensiveness_scores": na_offensiveness,
+        },
+        "combined": {
+            "overlap_counts": combined_stereotype_overlap_counts,
+            "overlap_percentages": combined_stereotype_overlap_percentages,
+            "offensiveness_scores": combined_offensiveness,
+        },
+        "regional_majority": {
+            "overlap_counts": region_stereotype_majority_overlap_counts,
+            "overlap_percentages": region_stereotype_majority_overlap_percentages,
+            "offensiveness_scores": regional_majority_offensiveness,
+        },
+        "north_american_majority": {
+            "overlap_counts": na_stereotype_majority_overlap_counts,
+            "overlap_percentages": na_stereotype_majority_overlap_percentages,
+            "offensiveness_scores": na_majority_offensiveness,
+        },
+        "combined_majority": {
+            "overlap_counts": combined_stereotype_majority_overlap_counts,
+            "overlap_percentages": combined_stereotype_majority_overlap_percentages,
+            "offensiveness_scores": combined_majority_offensiveness,
         },
     }
 

@@ -146,3 +146,52 @@ def create_report(trainer, dataset):
     }
 
     return detailed_report
+
+
+def load_seegull_data(seegull_path):
+    df = pd.read_csv(seegull_path)
+    region_stereotypes = {}
+    na_stereotypes = {}
+    combined_stereotypes = {}
+    offensiveness_scores = {}
+    region_stereotypes_majority = {}
+    na_stereotypes_majority = {}
+    combined_stereotypes_majority = {}
+
+    for _, row in df.iterrows():
+        country = row["identity"]
+        stereotype = row["attribute"].strip().lower()
+        region_stereo = int(row["region_stereo"])
+        na_stereo = int(row["NA_stereo"])
+        combined_stereo = region_stereo + na_stereo
+        offensiveness = float(row["mean offensiveness_score"])
+        if country not in region_stereotypes:
+            region_stereotypes[country] = set()
+            na_stereotypes[country] = set()
+            combined_stereotypes[country] = set()
+            region_stereotypes_majority[country] = set()
+            na_stereotypes_majority[country] = set()
+            combined_stereotypes_majority[country] = set()
+            offensiveness_scores[country] = {}
+        if region_stereo > 0:
+            region_stereotypes[country].add(stereotype)
+        if na_stereo > 0:
+            na_stereotypes[country].add(stereotype)
+        if combined_stereo > 0:
+            combined_stereotypes[country].add(stereotype)
+        if region_stereo > 1:
+            region_stereotypes_majority[country].add(stereotype)
+        if na_stereo > 1:
+            na_stereotypes_majority[country].add(stereotype)
+        if combined_stereo >= 3:
+            combined_stereotypes_majority[country].add(stereotype)
+        offensiveness_scores[country][stereotype] = offensiveness
+    return (
+        region_stereotypes,
+        na_stereotypes,
+        combined_stereotypes,
+        region_stereotypes_majority,
+        na_stereotypes_majority,
+        combined_stereotypes_majority,
+        offensiveness_scores,
+    )
