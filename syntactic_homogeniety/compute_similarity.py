@@ -27,7 +27,7 @@ def parse_args():
         type=str,
         default="wer",
         help="Similarity metric to use (e.g., wer).",
-        choices=["wer", "bleu"],
+        choices=["wer", "bleu", "lcs"],
     )
     parser.add_argument(
         "--topic_keys_start_index",
@@ -42,6 +42,34 @@ def parse_args():
         help="Slice size for sorted topic keys. If None, includes all topics from start index to the end.",
     )
     return parser.parse_args()
+
+
+def lcs(responses1, responses2):
+    def _lcs(a, b):
+        if len(a) == 0 or len(b) == 0:
+            return 1
+        m, n = len(a), len(b)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        best_len = 0
+        best_end_i = 0  # end index in a
+
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if a[i - 1] == b[j - 1]:
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                    if dp[i][j] > best_len:
+                        best_len = dp[i][j]
+                else:
+                    dp[i][j] = 0
+        lcs_value = 2 * best_len / (len(a) + len(b))
+        return lcs_value
+
+    scores = []
+    for r1 in responses1:
+        for r2 in responses2:
+            lcs_value = _lcs(r1, r2)
+            scores.append(lcs_value)
+    return sum(scores) / len(scores) if scores else 0.0
 
 
 def wer(responses1, responses2):
@@ -63,51 +91,17 @@ def wer(responses1, responses2):
 
 
 def bleu(responses1, responses2):
+    def _bleu(pred, ref):
+        bleu_score = sacrebleu.sentence_bleu(pred, [ref], tokenize="none")
+        return bleu_score.score / 100.0
+
     scores = []
-    references2 = []
-    for r2 in responses2:
-        if len(r2) > 0:
-            ref = " ".join(r2).strip()
-            references2.append(ref)
-        else:
-            continue
-
-    if references2:
-        for r1 in responses1:
-            if len(r1) > 0:
-                hypothesis = " ".join(r1).strip()
-                try:
-                    bleu_score = sacrebleu.sentence_bleu(
-                        hypothesis, references2, tokenize="none"
-                    )
-                    scores.append(bleu_score.score / 100.0)
-                except Exception as e:
-                    print(f"Error computing BLEU (dir1): {e}")
-                    continue
-            else:
-                continue
-    references1 = []
     for r1 in responses1:
-        if len(r1) > 0:
-            ref = " ".join(r1).strip()
-            references1.append(ref)
-        else:
-            continue
-
-    if references1:
         for r2 in responses2:
-            if len(r2) > 0:
-                hypothesis = " ".join(r2).strip()
-                try:
-                    bleu_score = sacrebleu.sentence_bleu(
-                        hypothesis, references1, tokenize="none"
-                    )
-                    scores.append(bleu_score.score / 100.0)
-                except Exception as e:
-                    print(f"Error computing BLEU (dir2): {e}")
-                    continue
-            else:
-                continue
+            score1 = _bleu(r1, r2)
+            score2 = _bleu(r2, r1)
+            scores.append((score1 + score2) / 2)
+
     return sum(scores) / len(scores) if scores else 0.0
 
 
@@ -218,7 +212,14 @@ if __name__ == "__main__":
         similarity_fn = wer
     elif args.metric == "bleu":
         similarity_fn = bleu
+    elif args.metric == "lcs":
+        similarity_fn = lcs
     print(f"Output path: {output_path}")
+
+    if os.path.exists(output_path):
+        print(f"Output file {output_path} already exists. Skipping computation.")
+        sys.exit(0)
+
     results = main(data, nationalities, similarity_fn, topic_keys)
     with open(output_path, "w") as f:
         json.dump(results, f, indent=4)
